@@ -45,15 +45,25 @@
 (defvar daily--buffer-name "*daily*"
   "Name of the buffer used for daily's main interface.")
 
+(defvar daily--text-buffer-name "*daily-text*"
+  "Name of the buffer designated for daily text operations.")
+
 (defvar daily--keymap
   (let ((map (copy-keymap ctbl:table-mode-map)))
     (define-key map (kbd "a") #'daily-add)
     (define-key map (kbd "e") #'daily-edit)
     (define-key map (kbd "d") #'daily-delete)
+    (define-key map (kbd "<RET>") #'daily-show)
+    (define-key map (kbd "<SPC>") #'daily-preview)
     map)
   "Keymap defining daily commands")
 
 ;;; Internal Functions
+(defun daily--show-one (one)
+  (with-current-buffer (get-buffer-create daily--text-buffer-name)
+    (erase-buffer)
+    (insert (daily-one-text one))
+    (org-mode)))
 
 (defun daily--dashboard-width ()
   "Calculates the usable dashboard width by subtracting the left and right window margins from the total window width."
@@ -105,6 +115,24 @@
                                      (string-join (mapcar #'daily-tag-name (daily-one-tags one)) ",")))))
 
 ;;; Interactive Functions
+(defun daily-show ()
+  ""
+  (interactive)
+  (let* ((row (ctbl:cp-get-selected-data-row (ctbl:cp-get-component)))
+         (uuid (car (last row)))
+         (one (daily-one-get uuid)))
+    (daily--show-one one)
+    (pop-to-buffer daily--text-buffer-name)))
+
+(defun daily-preview ()
+  ""
+  (interactive)
+  (daily-show)
+  (let ((daily-window (cl-find-if (lambda (window) (string= (buffer-name (window-buffer window)) daily--buffer-name))
+                                  (window-list))))
+    (when daily-window
+     (select-window daily-window))))
+
 (defun daily-add ()
   "Prompts the user to add a new daily entry. It generates a unique identifier for the entry, records the current time with a specified format, and requests user input for the text content. It also allows the user to add multiple tag names from a provided list, creating a daily-tag object for each with its own unique identifier and linking it to the entry via the same UUID. The function then saves the entry by updating or inserting it into the appropriate storage and refreshes the display."
   (interactive)
