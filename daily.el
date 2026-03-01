@@ -29,44 +29,36 @@
 
 ;;; Custom Variables
 (defcustom daily-time-format "%Y-%m-%d %H:%M:%S"
-  "")
+  "Format string used to display date and time values in daily.")
 
 (defcustom daily-page-size 30
-  "")
+  "Number of entries to load per page in daily lists.")
 
 ;;; Internal Variables
 
-(defvar-local daily--ctable-component nil)
-(defvar-local daily--current-page 1)
+(defvar-local daily--ctable-component nil
+  "Buffer-local ctable component instance used to render and manage the daily list view.")
 
-(defvar daily--buffer-name "*daily*")
+(defvar-local daily--current-page 1
+  "Current page number for paginated daily list data in the current buffer")
+
+(defvar daily--buffer-name "*daily*"
+  "Name of the buffer used for daily's main interface.")
+
 (defvar daily--keymap
   (let ((map (copy-keymap ctbl:table-mode-map)))
     (define-key map (kbd "a") #'daily-add)
     (define-key map (kbd "e") #'daily-edit)
     (define-key map (kbd "d") #'daily-delete)
-    map))
+    map)
+  "Keymap defining daily commands")
 
 ;;; Internal Functions
 
 (defun daily--dashboard-width ()
+  "Calculates the usable dashboard width by subtracting the left and right window margins from the total window width."
   (let ((margins (window-margins)))
     (- (window-width) (car margins) (cdr margins))))
-
-(cl-defmethod daily--to-ctable-data ((obj daily-tag))
-  (format "%s" (daily-tag-name obj)))
-
-(cl-defmethod daily--to-ctable-data ((obj daily-one))
-  (list (daily-one-date obj)
-        (string-replace
-         "\n"
-         " "
-         (daily-one-text obj))
-        (string-join
-         (mapcar #'daily--to-ctable-data
-                 (daily-one-tags obj))
-         ",")
-        (daily-obj-uuid obj)))
 
 (defun daily--uuid ()
   "Return string with random (version 4) UUID."
@@ -94,7 +86,7 @@
 
 ;;; Interactive Functions
 (defun daily-add ()
-  ""
+  "Prompts the user to add a new daily entry. It generates a unique identifier for the entry, records the current time with a specified format, and requests user input for the text content. It also allows the user to add multiple tag names from a provided list, creating a daily-tag object for each with its own unique identifier and linking it to the entry via the same UUID. The function then saves the entry by updating or inserting it into the appropriate storage and refreshes the display."
   (interactive)
   (let* ((one-uuid (daily--uuid))
          (one (daily-one
@@ -112,7 +104,7 @@
     (daily-refresh)))
 
 (defun daily-delete ()
-  ""
+  "Deletes the selected daily entry. The function retrieves the currently selected row's data, extracting the unique identifier, date, and text. It then prompts the user for confirmation to delete the entry, displaying the date and text. Upon confirmation, it deletes the entry identified by the unique identifier and refreshes the display."
   (interactive)
   (let* ((row (ctbl:cp-get-selected-data-row (ctbl:cp-get-component)))
          (uuid (car (last row)))
@@ -123,7 +115,7 @@
       (daily-refresh))))
 
 (defun daily-tag-edit ()
-  ""
+  "Edits the tags associated with a daily entry. The function retrieves the selected row's data to obtain the unique identifier, fetches the corresponding entry, and constructs a comma-separated string of current tag names. It then prompts the user to input new tag names using a multiple-choice completion interface with available tag options. Each input is transformed into a daily-tag object linked to the entry. Finally, it updates the entry with the new tags and refreshes the display."
   (interactive)
   (let* ((row (ctbl:cp-get-selected-data-row (ctbl:cp-get-component)))
          (uuid (car (last row)))
@@ -145,7 +137,7 @@
     (daily-refresh)))
 
 (defun daily-edit ()
-  ""
+  "Updates the text of a daily entry. The function retrieves the selected row's data, obtains the entry using its unique identifier, and prompts the user for updated text with the current text as the default. It then saves the updated entry and refreshes the display."
   (interactive)
   (let* ((row (ctbl:cp-get-selected-data-row (ctbl:cp-get-component)))
          (uuid (car (last row)))
@@ -155,13 +147,14 @@
     (daily-refresh)))
 
 (defun daily ()
-  ""
+  "Initializes the daily database, refreshes the display, and switches to the daily buffer for user interaction."
   (interactive)
   (daily-db-init)
   (daily-refresh)
   (switch-to-buffer daily--buffer-name))
 
 (defun daily-insert-dashboard-text ()
+  "Generates and inserts the dashboard header in the daily interface. It calculates the total entry count and determines the page number and total page count. The header includes a title with count and page information, a line of key command instructions, and decorative separator lines created with repeated characters, all styled with designated text properties."
   (let* ((count (daily-one-count))
          (page-count (1+ (/ count daily-page-size)))
          (title (format "Daily Text | Total: [%d] | Page: %d/%d  \n" count daily--current-page page-count))
@@ -178,6 +171,7 @@
            (propertize dash-line 'face 'font-lock-comment-face 'tiles-header t))))
 
 (defun daily-refresh ()
+  "Refreshes the daily interface. The function calculates dynamic widths for the date, text, and tags columns based on the dashboard width and current date format. It then builds a column model with title, alignment, and width settings, and obtains the data by converting daily entries to printable format. With the daily buffer created or retrieved, it disables the header display, erases the buffer if the table component is not present, inserts the dashboard header text, creates the table component with the specified model and keymap, and finally updates the table model with the new data while setting the buffer to read-only."
   (let* ((param (copy-ctbl:param ctbl:default-rendering-param))
          (date-length (length (format-time-string daily-time-format)))
          (tags-length 20)
@@ -193,7 +187,7 @@
                 (make-ctbl:cmodel
                  :title "Tags" :align 'left
                  :min-width tags-length :max-width date-length)))
-         (data (mapcar #'daily--to-ctable-data (daily-one-list)))
+         (data (mapcar #'daily-obj-to-printable (daily-one-list)))
          (model (make-ctbl:model :column-model column-model :data data)))
     (with-current-buffer (get-buffer-create daily--buffer-name)
       (let ((buffer-read-only nil))
@@ -202,7 +196,7 @@
           (erase-buffer)
           (daily-insert-dashboard-text)
           (setq-local daily--ctable-component (ctbl:create-table-component-region :model model :param param :keymap daily--keymap))
-          (ctbl:cp-add-click-hook daily--ctable-component (lambda () )))
+          (ctbl:cp-add-click-hook daily--ctable-component (lambda ())))
         (ctbl:cp-set-model daily--ctable-component model))
       (setq-local buffer-read-only t))))
 
