@@ -2,37 +2,108 @@
 #+author: Qiqi Jin
 #+language: zh
 
-* 概述
+* Daily.el
 
-* 前提
+一个基于 [[https://github.com/ginqi7/emacs-ctable][ctable]] 的 Emacs 日记 / 日志管理插件，支持增删改查、分页浏览与标签过滤。
 
-** 需要的 Emacs 包
+* 示例
 
-** 安装
-+ 克隆项目到你自己的 Emacs 配置目录下：
+#+begin_example
+Daily Text | Total: [42] | Page: 1/2
+══════════════════════════════════════════════════════════
+[SPC] view, [RET] open, [a] add, [e] edit, [d] delete, [g] refresh, [+] more, [q] quit
+[t] filter tag
+──────────────────────────────────────────────────────────
+       2024-01-01 12:00:00 | Today is a good day | work,life
+       2024-01-02 08:30:00 | Morning meeting done | work
+#+end_example
+
+* 依赖
+
+| 依赖                                               | 说明         |
+|----------------------------------------------------+--------------|
+| =[[https://github.com/ginqi7/emacs-ctable][ctable= | 表格渲染组件 |
+| =[[https://github.com/magit/emacsql][emacsql]]=    | 数据库操作   |
+
+* 安装
+
+** 手动安装
+克隆项目到你自己的 Emacs 配置目录下：
 #+BEGIN_SRC sh
   git clone https://github.com/ginqi7/daily ~/.emacs.d/lisp/daily;
 #+END_SRC
 
-+ 把克隆的路径添加到 =load-path= 当中
-#+BEGIN_SRC emacs-lisp
+把克隆的路径添加到 =load-path= 当中
+#+begin_src emacs-lisp
   (add-to-list 'load-path "~/.emacs.d/lisp/daily")
-#+END_SRC
-
-* 配置
-
-#+BEGIN_SRC emacs-lisp
-  (require 'daily)
 #+end_src
 
-** 变量
+* 使用
 
-| 变量 | 默认值 | 解释 |
-|------+--------+------|
-|      |        |      |
+** 启动
 
-* 特性
+#+begin_src emacs-lisp
+  M-x daily
+#+end_src
 
-* 例子
+** 按键绑定
 
-* Footnotes
+| 按键    | 功能             |
+|---------+------------------|
+| =a=     | 新增日志条目     |
+| =e=     | 编辑选中条目     |
+| =d=     | 删除选中条目     |
+| =g=     | 刷新列表         |
+| =t=     | 按标签过滤       |
+| =+=     | 加载更多（翻页） |
+| =SPC=   | 预览条目         |
+| =RET=   | 打开条目         |
+| =q=     | 退出             |
+
+** 新增条目
+
+按下 =a= 后，依次输入：
+
+1. 条目正文内容
+2. 标签（支持多选，以逗号分隔，可补全已有标签）
+
+** 编辑条目
+
+将光标移至目标行，按下 =e=：
+
+- 光标在 *日期列* → 编辑日期
+- 光标在 *正文列* → 编辑正文
+- 光标在 *标签列* → 编辑标签
+
+** 删除条目
+
+将光标移至目标行，按下 =d=，确认后删除。
+
+* 自定义变量
+
+| 变量                | 默认值              | 说明               |
+|---------------------+---------------------+--------------------|
+| =daily-time-format= | ~%Y-%m-%d %H:%M:%S~ | 日期时间显示格式   |
+| =daily-page-size=   | ~30~                | 每页加载的条目数量 |
+
+配置示例：
+
+#+begin_src emacs-lisp
+  (setq daily-time-format "%Y/%m/%d %H:%M")
+  (setq daily-page-size 50)
+#+end_src
+
+* 数据结构
+
+#+begin_example
+daily-one
+├── uuid   (string)   唯一标识符 (UUIDv4)
+├── date   (string)   创建时间
+├── text   (string)   正文内容
+└── tags   (list)     标签列表
+        └── daily-tag
+                ├── uuid      (string)  标签唯一标识符 (UUIDv4)
+                ├── name      (string)  标签名称
+                └── one-uuid  (string)  所属条目 UUID
+#+end_example
+
