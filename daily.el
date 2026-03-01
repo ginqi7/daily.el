@@ -202,7 +202,7 @@
           (erase-buffer)
           (daily-insert-dashboard-text)
           (setq-local daily--ctable-component (ctbl:create-table-component-region :model model :param param :keymap daily--keymap))
-          (ctbl:cp-add-click-hook daily--ctable-component (lambda () (daily-click))))
+          (ctbl:cp-add-click-hook daily--ctable-component (lambda () )))
         (ctbl:cp-set-model daily--ctable-component model))
       (setq-local buffer-read-only t))))
 
