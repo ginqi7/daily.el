@@ -58,7 +58,7 @@
 (defun daily--dashboard-width ()
   "Calculates the usable dashboard width by subtracting the left and right window margins from the total window width."
   (let ((margins (window-margins)))
-    (- (window-width) (car margins) (cdr margins))))
+    (- (window-width) (or (car margins) 0) (or (cdr margins) 0))))
 
 (defun daily--uuid ()
   "Return string with random (version 4) UUID."
