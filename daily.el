@@ -84,6 +84,26 @@
         (substring rnd 18 20)
         (substring rnd 20 32))))
 
+(defun daily--edit-one-date (one)
+  (daily-one-write-date one (read-string "Edit Date: " (daily-one-date one))))
+
+(defun daily--edit-one-text (one)
+  (daily-one-write-text one (read-string "Edit Text: " (daily-one-text one))))
+
+(defun daily--edit-one-tags (one)
+  (daily-one-write-tags
+   one
+   (mapcar (lambda (tag)
+             (daily-tag
+              :uuid (daily--uuid)
+              :name tag
+              :one-uuid (daily-obj-uuid one)))
+           (completing-read-multiple "Edit Tags: "
+                                     (daily-db-no-repeat-tag-names)
+                                     nil
+                                     nil
+                                     (string-join (mapcar #'daily-tag-name (daily-one-tags one)) ",")))))
+
 ;;; Interactive Functions
 (defun daily-add ()
   "Prompts the user to add a new daily entry. It generates a unique identifier for the entry, records the current time with a specified format, and requests user input for the text content. It also allows the user to add multiple tag names from a provided list, creating a daily-tag object for each with its own unique identifier and linking it to the entry via the same UUID. The function then saves the entry by updating or inserting it into the appropriate storage and refreshes the display."
@@ -114,35 +134,18 @@
       (daily-one-delete uuid)
       (daily-refresh))))
 
-(defun daily-tag-edit ()
-  "Edits the tags associated with a daily entry. The function retrieves the selected row's data to obtain the unique identifier, fetches the corresponding entry, and constructs a comma-separated string of current tag names. It then prompts the user to input new tag names using a multiple-choice completion interface with available tag options. Each input is transformed into a daily-tag object linked to the entry. Finally, it updates the entry with the new tags and refreshes the display."
-  (interactive)
-  (let* ((row (ctbl:cp-get-selected-data-row (ctbl:cp-get-component)))
-         (uuid (car (last row)))
-         (one (daily-one-get uuid))
-         (tags (string-join (mapcar #'daily-tag-name (daily-one-tags one)) ",")))
-    (daily-one-write-tags
-     one
-     (mapcar (lambda (tag)
-               (daily-tag
-                :uuid (daily--uuid)
-                :name tag
-                :one-uuid uuid))
-             (completing-read-multiple "Add Tags:"
-                                       (daily-db-no-repeat-tag-names)
-                                       nil
-                                       nil
-                                       tags)))
-    (daily-one-insert-or-update one)
-    (daily-refresh)))
-
 (defun daily-edit ()
-  "Updates the text of a daily entry. The function retrieves the selected row's data, obtains the entry using its unique identifier, and prompts the user for updated text with the current text as the default. It then saves the updated entry and refreshes the display."
+  "Edits a daily entry based on the selected row and column in the daily interface. The function retrieves the current table component, selected row, selected column, and the unique identifier from the row. It then fetches the corresponding daily entry and calls the appropriate editing routine depending on the selected column (date, text, or tags). Finally, it saves the changes to the entry and refreshes the interface."
   (interactive)
-  (let* ((row (ctbl:cp-get-selected-data-row (ctbl:cp-get-component)))
+  (let* ((cp (ctbl:cp-get-component))
+         (row (ctbl:cp-get-selected-data-row cp))
+         (col-num (cdr (ctbl:cp-get-selected cp)))
          (uuid (car (last row)))
          (one (daily-one-get uuid)))
-    (daily-one-write-text one (read-string "Update: " (daily-one-text one)))
+    (pcase col-num
+      (0 (daily--edit-one-date one))
+      (1 (daily--edit-one-text one))
+      (2 (daily--edit-one-tags one)))
     (daily-one-insert-or-update one)
     (daily-refresh)))
 

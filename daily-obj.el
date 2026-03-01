@@ -32,7 +32,7 @@
   "Defines a daily-obj class with a UUID attribute that is set during initialization and accessed using the daily-obj-uuid function.")
 
 (defclass daily-one (daily-obj)
-  ((date :initarg :date :reader daily-one-date)
+  ((date :initarg :date :reader daily-one-date :writer daily-one-write-date)
    (text :initarg :text :reader daily-one-text :writer daily-one-write-text)
    (tags :initarg :tags :reader daily-one-tags :writer daily-one-write-tags))
   "Defines the daily-one class, a subclass of daily-obj, with attributes for date, text, and tags. The date attribute is initialized with :date and accessed using daily-one-date. The text attribute is initialized with :text, accessed using daily-one-text, and writable using daily-one-write-text. The tags attribute is initialized with :tags, accessed using daily-one-tags, and writable using daily-one-write-tags.")
