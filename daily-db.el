@@ -174,7 +174,7 @@
       (daily-db-delete-one uuid)
       (daily-db-delete-tags uuid))))
 
-(cl-defun daily-db-list-one-uuid (&key offset limit date text tags)
+(cl-defun daily-db-list-one-uuid (&key offset limit date text tags order desc)
   "Return a list of uuid values for records in one that are not marked as deleted, limited by daily-db-limit."
   (let ((db (emacsql-sqlite-open daily-db-path))
         (offset (or offset 0))
@@ -193,9 +193,9 @@
                :clauses where-clause
                :limit limit
                :offset offset
-               :order 'date
-               :desc t))
-    (print sql)
+               :order order
+               :desc desc))
+    ;; (print sql)
     (mapcar #'car (emacsql db sql))))
 
 (defun daily-db-one-count ()

@@ -42,6 +42,16 @@
    (one-uuid :initarg :one-uuid :reader daily-tag-one-uuid))
   "Defines the daily-tag class as a subclass of daily-obj with attributes for name and one-uuid. The name attribute is initialized with :name and accessed using daily-tag-name. The one-uuid attribute is initialized with :one-uuid and accessed using daily-tag-one-uuid.")
 
+(defclass daily-filter (daily-obj)
+  ((date :initarg :date :reader daily-filter-date :initform nil :writer daily-filter-write-date)
+   (text :initarg :text :reader daily-filter-text :initform nil :writer daily-filter-write-text)
+   (tags :initarg :tags :reader daily-filter-tags :initform nil :writer daily-filter-write-tags)
+   (sort :initarg :sort :reader daily-filter-sort :initform 'date)
+   (reversed :initarg :reversed :reader daily-filter-reversed :initform t)
+   (page-num :initarg :page-num :reader daily-filter-page-num :initform 1)
+   (page-size :initarg :page-size :reader daily-filter-page-size :initform 1))
+  "")
+
 ;;; Internal Functions
 (defun daily-obj--to-one (rows)
   "Converts a list of rows into a daily-one object by extracting the primary fields (UUID, date, text) from the first row and mapping the remaining rows to daily-tag objects via daily-obj--to-tag, then assembling them as tags for the daily-one."
@@ -100,9 +110,17 @@
   "Fetches the daily-one object corresponding to the given UUID by retrieving it from the database and converting it."
   (daily-obj--to-one (daily-db-get-one uuid)))
 
-(defun daily-one-list()
+(defun daily-one-list(filter)
   "Lists all daily-one objects by retrieving their UUIDs from the database and converting each one using daily-one-get."
-  (mapcar #'daily-one-get (daily-db-list-one-uuid)))
+  (mapcar #'daily-one-get (daily-db-list-one-uuid
+                           :date (daily-filter-date filter)
+                           :text (daily-filter-text filter)
+                           :tags (daily-filter-tags filter)
+                           :order (daily-filter-sort filter)
+                           :desc (daily-filter-reversed filter)
+                           :limit (daily-filter-page-size filter)
+                           :offset (* (1- (daily-filter-page-num filter))
+                                      (daily-filter-page-size filter)))))
 
 (defun daily-one-count()
   "Returns the count of daily-one objects by querying the database."
