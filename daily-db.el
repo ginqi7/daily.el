@@ -39,6 +39,34 @@
 ;;; Internal Variables
 
 ;;; Internal Functions
+(defun daily-db--check (name value)
+  (unless value
+    (error (format "%s must be provided." name))))
+
+(cl-defun daily-db--select-sql-exp (&key columns table clauses offset limit order desc)
+  (daily-db--check ":table" table)
+  (let ((columns (or columns '(*)))
+        (offset (or offset 0))
+        (limit (or limit daily-db-limit)))
+    (vconcat [:select]
+             (list (vconcat columns))
+             (list :from table)
+             (when clauses (list :where clauses))
+             (when order (list :order :by order (when desc :desc)))
+             (list :limit (vector offset limit)))))
+
+(cl-defun daily-db--insert-or-update-sql-exp (&key columns table values)
+  (daily-db--check ":table" table)
+  (daily-db--check ":columns" columns)
+  (daily-db--check ":values" values)
+  (vconcat (vector :insert :into table)
+           (list (vconcat columns))
+           (list :values (mapcar #'vconcat values))
+           (list :on :conflict (vector (intern (format ":%s"(car columns)))))
+           (list :do :update :set)
+           (list (vconcat (mapcar
+                           (lambda (column) (list '= column (intern (format "excluded:%s" column))))
+                           (cdr columns))))))
 
 (defun daily-db--create-table-one ()
   "Create the one table in the daily database if it does not already exist."
@@ -72,33 +100,28 @@
              daily-db-limit)))
 
 (cl-defun daily-db-tag-insert-or-update (&key uuid name one-uuid)
-  "Insert a tag record or update the existing one with matching uuid using the provided uuid, name, and one-uuid.
-The one-uuid must be contained in the `one` table."
-  (unless (and uuid name one-uuid)
-    (error "UUID, Name and one-uuid must be provided."))
-  (let* ((db (emacsql-sqlite-open daily-db-path)))
-    (emacsql db
-             [:insert :into tag [uuid name one-uuid]
-                      :values [$s1 $s2 $s3]
-                      :on :conflict [:uuid]
-                      :do :update :set
-                      [(= name excluded:name)
-                       (= one-uuid excluded:one-uuid)]]
-             uuid name one-uuid)))
+  ""
+  (daily-db--check ":uuid" uuid)
+  (daily-db--check ":name" name)
+  (daily-db--check ":one-uuid" one-uuid)
+  (let* ((db (emacsql-sqlite-open daily-db-path))
+         (sql-exp (daily-db--insert-or-update-sql-exp
+                   :table 'tag
+                   :columns '(uuid name one-uuid)
+                   :values (list (list uuid name one-uuid)))))
+    (emacsql db sql-exp)))
 
 (cl-defun daily-db-one-insert-or-update (&key uuid text date)
-  "Insert a one record or update the existing one with matching uuid using the provided uuid, text, and date."
-  (unless (and uuid text date)
-    (error "UUID, Text and Date must be provided."))
-  (let* ((db (emacsql-sqlite-open daily-db-path)))
-    (emacsql db
-             [:insert :into one [uuid text date]
-                      :values [$s1 $s2 $s3]
-                      :on :conflict [:uuid]
-                      :do :update :set
-                      [(= text excluded:text)
-                       (= date excluded:date)]]
-             uuid text date)))
+  ""
+  (daily-db--check ":uuid" uuid)
+  (daily-db--check ":text" text)
+  (daily-db--check ":date" date)
+  (let* ((db (emacsql-sqlite-open daily-db-path))
+         (sql-exp (daily-db--insert-or-update-sql-exp
+                   :table 'one
+                   :columns '(uuid text date)
+                   :values (list (list uuid text date)))))
+    (emacsql db sql-exp)))
 
 (cl-defun daily-db-one-insert-or-update-with-tags (&key uuid text date tags)
   "Insert or update a one record, then replace its associated tags within a single transaction."
@@ -151,16 +174,29 @@ The one-uuid must be contained in the `one` table."
       (daily-db-delete-one uuid)
       (daily-db-delete-tags uuid))))
 
-(defun daily-db-list-one-uuid ()
+(cl-defun daily-db-list-one-uuid (&key offset limit date text tags)
   "Return a list of uuid values for records in one that are not marked as deleted, limited by daily-db-limit."
-  (let ((db (emacsql-sqlite-open daily-db-path)))
-    (mapcar #'car (emacsql db [:select
-                               uuid
-                               :from one
-                               :where (!= deleted 1)
-                               :order :by date :desc
-                               :limit $s1]
-                           daily-db-limit))))
+  (let ((db (emacsql-sqlite-open daily-db-path))
+        (offset (or offset 0))
+        (limit (min (or limit daily-db-limit) daily-db-limit))
+        (where-clause '(!= deleted 1))
+        (sql))
+    (when date
+      (setq where-clause (list 'and where-clause date)))
+    (when text
+      (setq where-clause (list 'and where-clause text)))
+    (when tags
+      (setq where-clause (list 'and where-clause tags)))
+    (setq sql (daily-db--select-sql-exp
+               :table 'one
+               :columns '(uuid)
+               :clauses where-clause
+               :limit limit
+               :offset offset
+               :order 'date
+               :desc t))
+    (print sql)
+    (mapcar #'car (emacsql db sql))))
 
 (defun daily-db-one-count ()
   "Return the count of records in one that are not marked as deleted."
