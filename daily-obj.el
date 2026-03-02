@@ -73,6 +73,16 @@
         (daily-tag-one-uuid obj)))
 
 ;;; API Functions
+(cl-defmethod daily-obj-to-org ((obj daily-one))
+  "Converts a daily entry object into an org-mode formatted string by creating a temporary buffer, inserting a headline with the entry date, adding properties with the object's UUID, appending its text content, and returning the resulting string."
+  (with-temp-buffer
+    (insert "* " (daily-one-date obj) "\n")
+    (insert ":PROPERTIES:\n"
+            ":ID:       " (daily-obj-uuid obj) "\n"
+            ":END:\n")
+    (insert (daily-one-text obj) "\n")
+    (buffer-substring (point-min) (point-max))))
+
 (cl-defmethod daily-obj-to-printable ((obj daily-tag))
   "Converts a daily-tag object into a printable string by formatting its tag name."
   (format "%s" (daily-tag-name obj)))

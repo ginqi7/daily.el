@@ -51,6 +51,9 @@
 (defvar daily--text-buffer-name "*daily-text*"
   "Name of the buffer designated for daily text operations.")
 
+(defvar daily--accumulate-buffer-name "*daily-accumulate*"
+  "Defines a variable to store the name of the accumulate buffer.")
+
 (defvar daily--keymap
   (let ((map (copy-keymap ctbl:table-mode-map)))
     (define-key map (kbd "a") #'daily-add)
@@ -58,6 +61,7 @@
     (define-key map (kbd "d") #'daily-delete)
     (define-key map (kbd "<RET>") #'daily-show)
     (define-key map (kbd "<SPC>") #'daily-preview)
+    (define-key map (kbd "g") #'daily-accumulate)
     map)
   "Keymap defining daily commands")
 
@@ -136,6 +140,18 @@
                                      (string-join (mapcar #'daily-tag-name (daily-one-tags one)) ",")))))
 
 ;;; Interactive Functions
+(defun daily-accumulate ()
+  "Accumulates daily entries by retrieving data from the current component's model, processing each entry through conversions, and inserting their org-mode representations into a dedicated accumulate buffer before switching to it."
+  (interactive)
+  (let* ((cp (ctbl:cp-get-component))
+         (model (ctbl:cp-get-model cp))
+         (data (ctbl:model-data model)))
+    (with-current-buffer (get-buffer-create daily--accumulate-buffer-name)
+      (erase-buffer)
+      (org-mode)
+      (mapcar #'insert (mapcar #'daily-obj-to-org (mapcar #'daily-one-get (mapcar #'car (mapcar #'last data)))))
+      (switch-to-buffer (current-buffer)))))
+
 (defun daily-show ()
   "Interactively retrieves the selected daily entry by obtaining its unique identifier, fetches the entry, displays its content using an internal display function, and switches to a designated text buffer."
   (interactive)
@@ -221,7 +237,7 @@
   (let* ((count (daily-one-count))
          (page-count (1+ (/ count daily-page-size)))
          (title (format "Daily Text | Total: [%d] | Page: %d/%d  \n" count daily--current-page page-count))
-         (keys (concat "[SPC] view, [RET] open, [a] add, [e] edit, [d] delete, [g] refresh, [+] more, [q] quit\n"
+         (keys (concat "[SPC] view, [RET] open, [a] add, [e] edit, [d] delete, [g] accumulate, [+] more, [q] quit\n"
                        "[t] filter tag\n"))
          (eq-char ?═)
          (dash-char ?─)
