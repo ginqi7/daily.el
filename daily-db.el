@@ -158,6 +158,7 @@ The one-uuid must be contained in the `one` table."
                                uuid
                                :from one
                                :where (!= deleted 1)
+                               :order :by date :desc
                                :limit $s1]
                            daily-db-limit))))
 

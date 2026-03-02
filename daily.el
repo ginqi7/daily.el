@@ -42,6 +42,9 @@
 (defvar-local daily--current-page 1
   "Current page number for paginated daily list data in the current buffer")
 
+(defvar-local daily--current-one nil
+  "Local variable to store the current daily entry for the buffer.")
+
 (defvar daily--buffer-name "*daily*"
   "Name of the buffer used for daily's main interface.")
 
@@ -60,10 +63,16 @@
 
 ;;; Internal Functions
 (defun daily--show-one (one)
+  "Displays the content of a given daily entry in the daily text buffer. The function creates or switches to the designated text buffer, enables org mode, sets the current daily entry as a local variable, configures the header line with the entry’s UUID and date, clears the buffer, and inserts the entry's text for editing."
   (with-current-buffer (get-buffer-create daily--text-buffer-name)
+    (org-mode)
+    (setq-local daily--current-one one)
+    (setq header-line-format (format "  [%s][%s]: Press 'C-c C-c' to submit your modifications."
+                                     (daily-obj-uuid one)
+                                     (daily-one-date one)))
     (erase-buffer)
     (insert (daily-one-text one))
-    (org-mode)))
+    (daily-text-mode)))
 
 (defun daily--dashboard-width ()
   "Calculates the usable dashboard width by subtracting the left and right window margins from the total window width."
@@ -94,13 +103,25 @@
         (substring rnd 18 20)
         (substring rnd 20 32))))
 
+(cl-defun daily--edit-one (one &key date text tags)
+  "Updates a daily entry's components based on provided keyword arguments. If a date is specified, the entry's date is updated; if text is specified, the entry's text is updated; and if tags are specified, the entry's tags are updated."
+  (when date
+    (daily-one-write-date one date))
+  (when text
+    (daily-one-write-text one text))
+  (when tags
+   (daily-one-write-tags one tags)))
+
 (defun daily--edit-one-date (one)
+  "Prompts the user to input a new date for the daily entry and updates the entry with the provided value."
   (daily-one-write-date one (read-string "Edit Date: " (daily-one-date one))))
 
 (defun daily--edit-one-text (one)
+  "Prompts the user to input new text for the daily entry and updates the entry with the provided value."
   (daily-one-write-text one (read-string "Edit Text: " (daily-one-text one))))
 
 (defun daily--edit-one-tags (one)
+  "Prompts the user to input tag names via a multiple-selection completion interface, maps each tag name to a tag object with a generated UUID and the current daily entry's UUID, and updates the entry's tags accordingly."
   (daily-one-write-tags
    one
    (mapcar (lambda (tag)
@@ -116,7 +137,7 @@
 
 ;;; Interactive Functions
 (defun daily-show ()
-  ""
+  "Interactively retrieves the selected daily entry by obtaining its unique identifier, fetches the entry, displays its content using an internal display function, and switches to a designated text buffer."
   (interactive)
   (let* ((row (ctbl:cp-get-selected-data-row (ctbl:cp-get-component)))
          (uuid (car (last row)))
@@ -125,7 +146,7 @@
     (pop-to-buffer daily--text-buffer-name)))
 
 (defun daily-preview ()
-  ""
+  "Interactively displays the daily entry preview by calling the daily-show function and then selecting the window that contains the designated daily buffer."
   (interactive)
   (daily-show)
   (let ((daily-window (cl-find-if (lambda (window) (string= (buffer-name (window-buffer window)) daily--buffer-name))
@@ -176,6 +197,17 @@
       (2 (daily--edit-one-tags one)))
     (daily-one-insert-or-update one)
     (daily-refresh)))
+
+(defun daily-edit-text-submit ()
+  "Interactively submits the edited text for the current daily entry. When the user confirms via a yes-no prompt, it captures the buffer's entire content as the new text, updates the current case, persists the changes, and refreshes the display."
+  (interactive)
+  (let* ((one daily--current-one))
+    (when (yes-or-no-p "Are you sure you want to submit the modified text?")
+      (daily--edit-one one
+                       :text (buffer-substring-no-properties (point-min) (point-max)))
+      (setq-local daily--current-one one)
+      (daily-one-insert-or-update one)
+      (daily-refresh))))
 
 (defun daily ()
   "Initializes the daily database, refreshes the display, and switches to the daily buffer for user interaction."
@@ -230,6 +262,14 @@
           (ctbl:cp-add-click-hook daily--ctable-component (lambda ())))
         (ctbl:cp-set-model daily--ctable-component model))
       (setq-local buffer-read-only t))))
+
+(define-minor-mode daily-text-mode
+  "Minor mode for daily text editing."
+  :lighter " Daily"
+  :keymap
+  (let ((map (make-sparse-keymap)))
+    (define-key map (kbd "C-c C-c") #'daily-edit-text-submit)
+    map))
 
 (provide 'daily)
 ;;; daily.el ends here
