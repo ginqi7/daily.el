@@ -47,7 +47,7 @@
                              :page-size daily-page-size
                              :sort 'date
                              :reversed t)
-  "")
+  "Holds the daily filter instance with default pagination, sorting, and filtering settings for daily entries.")
 
 (defvar-local daily--current-one nil
   "Local variable to store the current daily entry for the buffer.")
@@ -74,6 +74,13 @@
   "Keymap defining daily commands")
 
 ;;; Internal Functions
+(defun daily--filter-exp-to-str (exp)
+  "Converts a list of filter expressions into a single string representation by iterating over each element. Each element is formatted so that if it is a string, it is enclosed in quotes; otherwise, it is formatted normally."
+  (format "%s"
+          (mapcar
+           (lambda (exp) (format (if (stringp exp) "\"%s\"" "%s") exp))
+           exp)))
+
 (defun daily--show-one (one)
   "Displays the content of a given daily entry in the daily text buffer. The function creates or switches to the designated text buffer, enables org mode, sets the current daily entry as a local variable, configures the header line with the entry’s UUID and date, clears the buffer, and inserts the entry's text for editing."
   (with-current-buffer (get-buffer-create daily--text-buffer-name)
@@ -148,20 +155,44 @@
                                      (string-join (mapcar #'daily-tag-name (daily-one-tags one)) ",")))))
 
 ;;; Interactive Functions
+(defun daily-set-filter-date (&optional date-filter)
+  "Prompts the user to update the date filter expression for the daily filter. If an optional date filter is provided, it uses that; otherwise, it defaults to the current date filter or a generic filter expression. The function converts the filter expression to a string for display, lets the user modify it via an interactive prompt, updates the daily filter with the new value, and then refreshes the interface."
+  (interactive)
+  (let* ((date-filter-exp (or date-filter (daily-filter-date daily--filter) '(like date "%%")))
+         (date-filter-str (daily--filter-exp-to-str date-filter-exp)))
+    (daily-filter-write-date daily--filter (read--expression "Set Date Filter: "  date-filter-str)))
+  (daily-refresh))
+
+(defun daily-set-filter-text (&optional text-filter)
+  "Sets the text filter for the daily filter configuration. It uses an optional text filter argument if provided; otherwise, it defaults to the current text filter or a generic filter expression. The function converts the filter expression to a string for display, prompts the user to modify it interactively, updates the daily filter with the new value, and then refreshes the interface."
+  (interactive)
+  (let* ((text-filter-exp (or text-filter (daily-filter-text daily--filter) '(like text "%%")))
+         (text-filter-str (daily--filter-exp-to-str text-filter-exp)))
+    (daily-filter-write-text daily--filter (read--expression "Set Text Filter: "  text-filter-str)))
+  (daily-refresh))
+
+(defun daily-set-filter-tags (&optional text-filter)
+  "Sets the tags filter for the daily filter configuration. It uses an optional filter if provided; otherwise, it defaults to the current tags filter or a generic filter expression. The function converts the filter expression to a string, prompts the user to modify it interactively, updates the daily filter with the new value, and then refreshes the interface."
+  (interactive)
+  (let* ((tags-filter-exp (or tags-filter (daily-filter-tags daily--filter) '(like tags "%%")))
+         (tags-filter-str (daily--filter-exp-to-str tags-filter-exp)))
+    (daily-filter-write-tags daily--filter (read--expression "Set Tags Filter: "  tags-filter-str)))
+  (daily-refresh))
+
 (defun daily-set-filter ()
-  ""
+  "Sets the daily filter based on the selected data row and column in the component. Depending on the selected column (date, text, or tags), it prompts the user to input a new filter value, updates the appropriate field in the filter object, and refreshes the daily view."
   (interactive)
   (let* ((cp (ctbl:cp-get-component))
          (row (ctbl:cp-get-selected-data-row cp))
+         (cell (ctbl:cp-get-selected-data-cell cp))
          (col-num (cdr (ctbl:cp-get-selected cp)))
          (uuid (car (last row)))
          (one (daily-one-get uuid)))
     (pcase col-num
-      (0 (daily-filter-write-date daily--filter (read--expression "Set Date Filter: ")))
-      (1 (daily-filter-write-text daily--filter (read--expression "Set Text Filter: ")))
-      (2 (daily-filter-write-tags daily--filter (read--expression "Set Tags Filter: "))))
-    (daily-refresh)))
-
+      (0 (daily-set-filter-date `(like date ,cell)))
+      (1 (daily-set-filter-text))
+      (2 (daily-set-filter-tags)))))
+    
 (defun daily-accumulate ()
   "Accumulates daily entries by retrieving data from the current component's model, processing each entry through conversions, and inserting their org-mode representations into a dedicated accumulate buffer before switching to it."
   (interactive)
@@ -270,11 +301,12 @@
            (propertize keys 'face 'font-lock-comment-face 'tiles-header t)
            (propertize dash-line 'face 'font-lock-comment-face 'tiles-header t)
            (concat "Filters | Date: "
-                   (buttonize (format "%s" (daily-filter-date daily--filter)) nil)
+                   (buttonize (format "%s" (daily--filter-exp-to-str (daily-filter-date daily--filter)))
+                              (lambda (_) (daily-set-filter-date)))
                    " | Text: "
-                   (buttonize (format "%s" (daily-filter-text daily--filter)) nil)
+                   (buttonize (format "%s" (daily--filter-exp-to-str (daily-filter-text daily--filter))) nil)
                    " | Tags: "
-                   (buttonize (format "%s" (daily-filter-tags daily--filter)) nil)
+                   (buttonize (format "%s" (daily--filter-exp-to-str (daily-filter-tags daily--filter))) nil)
                    "\n"))))
 
 (defun daily-refresh ()
