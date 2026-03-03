@@ -304,9 +304,11 @@
                    (buttonize (format "%s" (daily--filter-exp-to-str (daily-filter-date daily--filter)))
                               (lambda (_) (daily-set-filter-date)))
                    " | Text: "
-                   (buttonize (format "%s" (daily--filter-exp-to-str (daily-filter-text daily--filter))) nil)
+                   (buttonize (format "%s" (daily--filter-exp-to-str (daily-filter-text daily--filter)))
+                              (lambda (_) (daily-set-filter-text)))
                    " | Tags: "
-                   (buttonize (format "%s" (daily--filter-exp-to-str (daily-filter-tags daily--filter))) nil)
+                   (buttonize (format "%s" (daily--filter-exp-to-str (daily-filter-tags daily--filter)))
+                              (lambda (_) (daily-set-filter-tags)))
                    "\n"))))
 
 (defun daily-refresh ()
