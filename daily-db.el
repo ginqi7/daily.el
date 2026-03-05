@@ -100,7 +100,7 @@
              daily-db-limit)))
 
 (cl-defun daily-db-tag-insert-or-update (&key uuid name one-uuid)
-  ""
+  "Insert or update a tag row in the database."
   (daily-db--check ":uuid" uuid)
   (daily-db--check ":name" name)
   (daily-db--check ":one-uuid" one-uuid)
@@ -112,7 +112,7 @@
     (emacsql db sql-exp)))
 
 (cl-defun daily-db-one-insert-or-update (&key uuid text date)
-  ""
+  "Inserts or updates a record in the \"one\" table of the daily database. The function validates that the UUID, text, and date keys are provided, then opens a SQLite database connection, constructs an SQL expression with the given parameters, and executes it to update the record."
   (daily-db--check ":uuid" uuid)
   (daily-db--check ":text" text)
   (daily-db--check ":date" date)
@@ -174,6 +174,28 @@
       (daily-db-delete-one uuid)
       (daily-db-delete-tags uuid))))
 
+(cl-defun daily-tags-list-one-uuid (&key offset limit date text names order desc)
+  "Retrieves a list of one-uuid values from the tag table in the daily database. It opens a SQLite connection, applies optional offset and limit constraints, and if provided, filters by names. An SQL expression is constructed using the given parameters, executed, and the function returns the one-uuid values extracted from the query results."
+  (let ((db (emacsql-sqlite-open daily-db-path))
+        (offset (or offset 0))
+        (limit (min (or limit daily-db-limit) daily-db-limit))
+        (where-clause)
+        (sql))
+    (when names
+      (setq where-clause (list 'in 'name (vconcat names))))
+    (setq sql (daily-db--select-sql-exp
+               :table 'tag
+               :columns '(one-uuid)
+               :clauses where-clause
+               :limit limit
+               :offset offset
+               :order order
+               :desc desc))
+    ;; (print sql)
+    (mapcar #'car (emacsql db sql))))
+
+(daily-tags-list-one-uuid :names '("test" "food"))
+
 (cl-defun daily-db-list-one-uuid (&key offset limit date text tags order desc)
   "Return a list of uuid values for records in one that are not marked as deleted, limited by daily-db-limit."
   (let ((db (emacsql-sqlite-open daily-db-path))
@@ -186,7 +208,7 @@
     (when text
       (setq where-clause (list 'and where-clause text)))
     (when tags
-      (setq where-clause (list 'and where-clause tags)))
+      (setq where-clause (list 'and where-clause (list 'in 'uuid (vconcat (daily-tags-list-one-uuid :names tags))))))
     (setq sql (daily-db--select-sql-exp
                :table 'one
                :columns '(uuid)

@@ -171,12 +171,16 @@
     (daily-filter-write-text daily--filter (read--expression "Set Text Filter: "  text-filter-str)))
   (daily-refresh))
 
-(defun daily-set-filter-tags (&optional text-filter)
+(defun daily-set-filter-tags (&optional tags-filter)
   "Sets the tags filter for the daily filter configuration. It uses an optional filter if provided; otherwise, it defaults to the current tags filter or a generic filter expression. The function converts the filter expression to a string, prompts the user to modify it interactively, updates the daily filter with the new value, and then refreshes the interface."
   (interactive)
-  (let* ((tags-filter-exp (or tags-filter (daily-filter-tags daily--filter) '(like tags "%%")))
-         (tags-filter-str (daily--filter-exp-to-str tags-filter-exp)))
-    (daily-filter-write-tags daily--filter (read--expression "Set Tags Filter: "  tags-filter-str)))
+  (let* ((tags-filter (or tags-filter (daily-filter-tags daily--filter))))
+    (daily-filter-write-tags daily--filter (completing-read-multiple
+                                            "Set Tags Filter: "
+                                            (daily-db-no-repeat-tag-names)
+                                            nil
+                                            nil
+                                            (string-join tags-filter ","))))
   (daily-refresh))
 
 (defun daily-set-filter ()
@@ -191,8 +195,8 @@
     (pcase col-num
       (0 (daily-set-filter-date `(like date ,cell)))
       (1 (daily-set-filter-text))
-      (2 (daily-set-filter-tags)))))
-    
+      (2 (daily-set-filter-tags (string-split cell ","))))))
+
 (defun daily-accumulate ()
   "Accumulates daily entries by retrieving data from the current component's model, processing each entry through conversions, and inserting their org-mode representations into a dedicated accumulate buffer before switching to it."
   (interactive)
