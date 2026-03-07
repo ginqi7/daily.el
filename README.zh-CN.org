@@ -4,7 +4,7 @@
 #+options: toc:2 num:t
 
 #+HTML: <a href="https://github.com/ginqi7/daily"><img src="https://img.shields.io/badge/version-1.0.0-blue.svg"/></a>
-#+HTML: <a href="https://github.com/ginqi7/daily/blob/master/README.org"><img src="https://img.shields.io/badge/README-English-555555.svg"/></a>
+#+HTML: <a href="https://github.com/ginqi7/daily.el"><img src="https://img.shields.io/badge/README-English-555555.svg"/></a>
 #+HTML: <a href="https://www.gnu.org/licenses/gpl-3.0.html"><img src="https://img.shields.io/badge/license-GPLv3-green.svg"/></a>
 
 * 概述
