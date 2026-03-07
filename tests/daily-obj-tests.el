@@ -50,12 +50,12 @@
 
 (ert-deftest test-daily-one-create-with-tags ()
   "Test creating a daily-one instance with tags."
-  (let ((tag1 (daily-tag :uuid "tag-uuid-001" :name "work" :one-uuid "one-uuid-001"))
-        (tag2 (daily-tag :uuid "tag-uuid-002" :name "personal" :one-uuid "one-uuid-001"))
-        (one (daily-one :uuid "one-uuid-001"
-                        :date "2026-03-07 10:00:00"
-                        :text "Test content"
-                        :tags (list tag1 tag2))))
+  (let* ((tag1 (daily-tag :uuid "tag-uuid-001" :name "work" :one-uuid "one-uuid-001"))
+         (tag2 (daily-tag :uuid "tag-uuid-002" :name "personal" :one-uuid "one-uuid-001"))
+         (one (daily-one :uuid "one-uuid-001"
+                         :date "2026-03-07 10:00:00"
+                         :text "Test content"
+                         :tags (list tag1 tag2))))
     (should (equal 2 (length (daily-one-tags one))))
     (should (equal "work" (daily-tag-name (nth 0 (daily-one-tags one)))))
     (should (equal "personal" (daily-tag-name (nth 1 (daily-one-tags one)))))))
