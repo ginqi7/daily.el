@@ -194,7 +194,7 @@
     ;; (print sql)
     (mapcar #'car (emacsql db sql))))
 
-(daily-tags-list-one-uuid :names '("test" "food"))
+;; (daily-tags-list-one-uuid :names '("test" "food"))
 
 (cl-defun daily-db-list-one-uuid (&key offset limit date text tags order desc)
   "Return a list of uuid values for records in one that are not marked as deleted, limited by daily-db-limit."
