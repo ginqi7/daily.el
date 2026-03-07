@@ -135,12 +135,17 @@
 
 (ert-deftest test-daily-set-filter-tags ()
   "Test setting tags filter."
-  (let ((daily--filter (daily-filter :page-num 1 :page-size 30))
-        (completing-read-multiple-hook (lambda (&rest _) '("work" "personal"))))
-    (cl-letf (((symbol-function 'completing-read-multiple) completing-read-multiple-hook)
-              ((symbol-function 'daily-refresh) #'ignore))
-      (daily-set-filter-tags '("test")))
-    (should (equal '("work" "personal") (daily-filter-tags daily--filter)))))
+  (let* ((daily-db-path (make-temp-file "daily-db-test" nil ".db"))
+         (daily--filter (daily-filter :page-num 1 :page-size 30))
+         (completing-read-multiple-hook (lambda (&rest _) '("work" "personal"))))
+    (unwind-protect
+        (progn
+          (daily-db-init)
+          (cl-letf (((symbol-function 'completing-read-multiple) completing-read-multiple-hook)
+                    ((symbol-function 'daily-refresh) #'ignore))
+            (daily-set-filter-tags '("test")))
+          (should (equal '("work" "personal") (daily-filter-tags daily--filter))))
+      (delete-file daily-db-path))))
 
 ;;; daily-text-mode Tests
 
