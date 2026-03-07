@@ -57,7 +57,7 @@
   "Converts a list of rows into a daily-one object by extracting the primary fields (UUID, date, text) from the first row and mapping the remaining rows to daily-tag objects via daily-obj--to-tag, then assembling them as tags for the daily-one."
   (let* ((tag-row-length (length (eieio-class-slots 'daily-tag)))
          (one-row-length (length (eieio-class-slots 'daily-one)))
-         (one-row (seq-take (first rows) one-row-length))
+         (one-row (seq-take (car rows) one-row-length))
          (tag-rows (remove nil (mapcar (lambda (row) (remove nil (last row tag-row-length))) rows))))
     (daily-one
      :uuid (nth 0 one-row)
