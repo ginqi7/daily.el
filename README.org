@@ -1,37 +1,296 @@
-#+title: daily
+#+title: daily.el - Emacs Daily/Journal Management
 #+author: Qiqi Jin
 #+language: en
+#+options: toc:2 num:t
 
-#+HTML: <a href ="https://github.com/ginqi7/daily/blob/master/README.zh-CN.org"><img src="https://img.shields.io/badge/README-%E7%AE%80%E4%BD%93%E4%B8%AD%E6%96%87-555555.svg"/></a>
+#+HTML: <a href="https://github.com/ginqi7/daily"><img src="https://img.shields.io/badge/version-1.0.0-blue.svg"/></a>
+#+HTML: <a href="https://github.com/ginqi7/daily/blob/master/README.zh-CN.org"><img src="https://img.shields.io/badge/README-%E7%AE%80%E4%BD%93%E4%B8%AD%E6%96%87-555555.svg"/></a>
+#+HTML: <a href="https://www.gnu.org/licenses/gpl-3.0.html"><img src="https://img.shields.io/badge/license-GPLv3-green.svg"/></a>
 
 * Overview
 
+A powerful Emacs daily/journal management package built on [[https://github.com/ginqi7/emacs-ctable][ctable]] and [[https://github.com/magit/emacsql][emacsql]]. It provides a complete solution for managing your daily entries with features including:
+
+- Create, edit, and delete entries
+- Tag-based filtering and organization
+- Paginated browsing with customizable page size
+- SQLite database backend for persistent storage
+- Interactive dashboard with filter buttons
+- Org-mode integration for entry content
+
+* Table of Contents
+
+1. [[#prerequisites][Prerequisites]]
+2. [[#installation][Installation]]
+3. [[#usage][Usage]]
+4. [[#key-bindings][Key Bindings]]
+5. [[#configuration][Configuration]]
+6. [[#data-structure][Data Structure]]
+7. [[#api-reference][API Reference]]
+8. [[#testing][Testing]]
+9. [[#troubleshooting][Troubleshooting]]
+10. [[#contributing][Contributing]]
+11. [[#license][License]]
+
 * Prerequisites
 
-** Install
-+ clone the project in your own emacs configuration files directory, like:
-  #+BEGIN_SRC sh
-    git clone https://github.com/ginqi7/daily ~/.emacs.d/lisp/daily;
-  #+END_SRC
+** Dependencies
 
-+ add the path to 'load-path'
-  #+BEGIN_SRC emacs-lisp
-    (add-to-list 'load-path "~/.emacs.d/lisp/daily")
-  #+END_SRC
+| Dependency                                 | Description              |
+|--------------------------------------------+--------------------------|
+| [[https://github.com/ginqi7/emacs-ctable][ctable]]                                   | Table rendering component  |
+| [[https://github.com/magit/emacsql][emacsql]]                                  | SQL database operations    |
+
+** Install Dependencies
+
+Run the dependencies script:
+
+#+BEGIN_SRC sh
+  ./dependencies.sh
+#+END_SRC
+
+* Installation
+
+** Method 1: Git Clone
+
+Clone the repository to your Emacs configuration directory:
+
+#+BEGIN_SRC sh
+  git clone https://github.com/ginqi7/daily ~/.emacs.d/lisp/daily
+#+END_SRC
+
+Add the path to your =load-path= in Emacs config:
+
+#+BEGIN_SRC emacs-lisp
+  (add-to-list 'load-path "~/.emacs.d/lisp/daily")
+  (require 'daily)
+#+END_SRC
+
+** Method 2: Using use-package
+
+#+BEGIN_SRC emacs-lisp
+  (use-package daily
+    :load-path "~/.emacs.d/lisp/daily"
+    :commands daily)
+#+END_SRC
+
+* Usage
+
+** Start daily
+
+#+BEGIN_SRC emacs-lisp
+  M-x daily
+#+END_SRC
+
+Or add a key binding in your Emacs config:
+
+#+BEGIN_SRC emacs-lisp
+  (global-set-key (kbd "C-c d") #'daily)
+#+END_SRC
+
+** Interface Preview
+
+#+BEGIN_EXAMPLE
+  Daily Text | Total: [42] | Page: 1/2
+  ══════════════════════════════════════════════════════════
+  [SPC] view, [RET] open, [a] add, [e] edit, [d] delete, [g] refresh, [+] more, [q] quit
+  [f] filter
+  ──────────────────────────────────────────────────────────
+  Filters | Date: ["%"] | Text: ["%"] | Tags: []
+  ──────────────────────────────────────────────────────────
+       2024-01-01 12:00:00 | Today is a good day | work,life
+       2024-01-02 08:30:00 | Morning meeting done | work
+  ──────────────────────────────────────────────────────────
+#+END_EXAMPLE
+
+* Key Bindings
+
+** Main Interface
+
+| Key    | Function                   |
+|--------+----------------------------|
+| =a=    | Add new entry              |
+| =e=    | Edit selected entry        |
+| =d=    | Delete selected entry      |
+| =g=    | Refresh/Accumulate         |
+| =f=    | Set filter by column       |
+| =SPC=  | Preview entry              |
+| =RET=  | Open entry in new buffer   |
+| =+=    | Load more (next page)      |
+| =q=    | Quit                       |
+
+** Text Edit Mode
+
+| Key         | Function               |
+|-------------+------------------------|
+| =C-c C-c=   | Submit edited text     |
 
 * Configuration
-Here are a few variables that can be used for configuration:
+
+** Custom Variables
+
+| Variable            | Default Value        | Description                  |
+|---------------------+----------------------+------------------------------|
+| =daily-time-format= | ="%Y-%m-%d %H:%M:%S"= | Date/time display format     |
+| =daily-page-size=   | =30=                  | Number of entries per page   |
+| =daily-db-path=     | =~/daily.db=          | Path to the SQLite database  |
+| =daily-db-limit=    | =100=                 | Maximum records in database  |
+
+** Configuration Example
+
 #+BEGIN_SRC emacs-lisp
   (require 'daily)
-#+end_src
 
-** Variables
-| variable | default value | explain |
-|----------+---------------+---------|
-|          |               |         |
+  ;; Custom date/time format
+  (setq daily-time-format "%Y/%m/%d %H:%M")
 
-* Features
+  ;; Set page size to 50 entries
+  (setq daily-page-size 50)
 
-* Example
+  ;; Custom database path
+  (setq daily-db-path "~/.emacs.d/daily.db")
+#+END_SRC
 
-* Footnotes
+* Data Structure
+
+** daily-one (Entry)
+
+#+BEGIN_EXAMPLE
+  daily-one
+  ├── uuid      (string)   Unique identifier (UUIDv4)
+  ├── date      (string)   Creation timestamp
+  ├── text      (string)   Text content
+  └── tags      (list)     List of tags
+          └── daily-tag
+              ├── uuid      (string)  Tag unique ID
+              ├── name      (string)  Tag name
+              └── one-uuid  (string)  Parent entry UUID
+#+END_EXAMPLE
+
+** Database Schema
+
+*** Table: one
+
+| Column  | Type    | Description                    |
+|---------+---------+--------------------------------|
+| uuid    | TEXT    | Primary key                    |
+| date    | TEXT    | Timestamp                      |
+| text    | TEXT    | Content                        |
+| deleted | INTEGER | Soft delete flag (0/1)         |
+
+*** Table: tag
+
+| Column   | Type | Description                              |
+|----------+------+------------------------------------------|
+| uuid     | TEXT | Primary key                              |
+| name     | TEXT | Tag name                                 |
+| one-uuid | TEXT | Foreign key referencing one(uuid)        |
+
+* API Reference
+
+** Core Functions
+
+| Function                              | Description                              |
+|---------------------------------------+------------------------------------------|
+| =daily=                               | Start the daily interface                |
+| =daily-add=                           | Add a new entry                          |
+| =daily-edit=                          | Edit selected entry                      |
+| =daily-delete=                        | Delete selected entry                    |
+| =daily-show=                          | Open entry in text buffer                |
+| =daily-preview=                       | Preview entry                            |
+| =daily-refresh=                       | Refresh the interface                    |
+| =daily-accumulate=                    | Accumulate entries in org format         |
+| =daily-set-filter=                    | Set filter by selected column            |
+| =daily-set-filter-date=               | Set date filter                          |
+| =daily-set-filter-text=               | Set text filter                          |
+| =daily-set-filter-tags=               | Set tags filter                          |
+
+** Database Functions
+
+| Function                                     | Description                                |
+|----------------------------------------------+--------------------------------------------|
+| =daily-db-init=                              | Initialize database tables                 |
+| =daily-db-one-insert-or-update=              | Insert or update a one entry               |
+| =daily-db-tag-insert-or-update=              | Insert or update a tag                     |
+| =daily-db-one-insert-or-update-with-tags=    | Insert or update entry with tags           |
+| =daily-db-get-one=                           | Get entry by UUID with tags                |
+| =daily-db-list-one-uuid=                     | List entry UUIDs with filters              |
+| =daily-db-delete-one=                        | Soft delete an entry                       |
+| =daily-db-delete-one-with-tags=              | Soft delete entry and remove tags          |
+| =daily-db-delete-tags=                       | Delete tags for an entry                   |
+| =daily-db-one-count=                         | Count non-deleted entries                  |
+| =daily-db-no-repeat-tag-names=               | Get distinct tag names                     |
+
+* Testing
+
+** Run Tests
+
+Run all tests using Make:
+
+#+BEGIN_SRC sh
+  make test
+#+END_SRC
+
+Or run tests interactively in Emacs:
+
+#+BEGIN_SRC emacs-lisp
+  M-x ert-run-tests-batch RET "test-daily-db-" RET
+#+END_SRC
+
+** Available Tests
+
+| Test Name                                        | Description                                     |
+|--------------------------------------------------+-------------------------------------------------|
+| =test-daily-db-tag-insert-or-update=             | Test tag insert/update without duplication      |
+| =test-daily-db-one-insert-or-update=             | Test one entry insert/update operations         |
+| =test-daily-db-tag-insert-or-update-multiple-tags= | Test multiple tags for single entry           |
+| =test-daily-db-delete-tags=                      | Test deleting tags for an entry                 |
+| =test-daily-db-delete-one=                       | Test soft delete functionality                  |
+| =test-daily-db-delete-one-with-tags=             | Test soft delete with tag removal               |
+| =test-daily-db-get-one=                          | Test retrieving entry with tags                 |
+| =test-daily-db-list-one-uuid=                    | Test listing entries with filters               |
+| =test-daily-db-one-count=                        | Test counting entries                           |
+| =test-daily-db-no-repeat-tag-names=              | Test distinct tag names retrieval               |
+
+* Troubleshooting
+
+** Common Issues
+
+*** Issue: "Cannot open load file: ctable"
+
+Solution: Ensure ctable is installed and added to load-path.
+
+*** Issue: Database file is locked
+
+Solution: Close any other Emacs instances using the same database file.
+
+* Contributing
+
+Contributions are welcome! Please feel free to submit issues or pull requests.
+
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a Pull Request
+
+* License
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+* Links
+
+- GitHub: [[https://github.com/ginqi7/daily]]
+- Issues: [[https://github.com/ginqi7/daily/issues]]
+- Chinese README: [[file:README.zh-CN.org][README.zh-CN.org]]
