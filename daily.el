@@ -24,8 +24,8 @@
 
 ;;; Code:
 
-(require 'ctable)
 (require 'daily-obj)
+(require 'daily-ui)
 
 ;;; Custom Variables
 (defcustom daily-time-format "%Y-%m-%d %H:%M:%S"
@@ -36,9 +36,6 @@
 
 ;;; Internal Variables
 
-(defvar-local daily--ctable-component nil
-  "Buffer-local ctable component instance used to render and manage the daily list view.")
-
 (defvar-local daily--current-page 1
   "Current page number for paginated daily list data in the current buffer")
 
@@ -48,6 +45,15 @@
                              :sort 'date
                              :reversed t)
   "Holds the daily filter instance with default pagination, sorting, and filtering settings for daily entries.")
+
+(defun daily-filter-reset ()
+  ""
+  (interactive)
+  (setq daily--filter (daily-filter
+                       :page-num 1
+                       :page-size daily-page-size
+                       :sort 'date
+                       :reversed t)))
 
 (defvar-local daily--current-one nil
   "Local variable to store the current daily entry for the buffer.")
@@ -181,6 +187,33 @@
                                             nil
                                             nil
                                             (string-join tags-filter ","))))
+  (daily-refresh))
+
+(defun daily-set-filter-sort (&optional sort)
+  "Set the sorting criterion for the daily filter by prompting the user to select from date, text, or tags, then refresh the display."
+  (interactive)
+  (let* ((sort (or sort (daily-filter-sort daily--filter))))
+    (daily-filter-write-sort daily--filter (completing-read
+                                            "Set Sort: "
+                                            '(date text tags))))
+  (daily-refresh))
+
+(defun daily-set-filter-sort-reversed (&optional reversed)
+  "Toggle the reversed sorting order for the daily filter by prompting the user for confirmation and then refresh the display."
+  (interactive)
+  (daily-filter-write-reversed daily--filter (yes-or-no-p "Sort Reversed:"))
+  (daily-refresh))
+
+(defun daily-set-filter-page-num ()
+  "Set the page number for the daily filter by prompting the user for a value and then refresh the display."
+  (interactive)
+  (daily-filter-write-page-num daily--filter (read-number "Page Number: "))
+  (daily-refresh))
+
+(defun daily-set-filter-page-size ()
+  "Set the page size for the daily filter by prompting the user for a value and then refresh the display."
+  (interactive)
+  (daily-filter-write-page-size daily--filter (read-number "Page Size: "))
   (daily-refresh))
 
 (defun daily-set-filter ()
@@ -345,6 +378,14 @@
         (ctbl:cp-add-click-hook daily--ctable-component (lambda ()))
         (ctbl:cp-set-model daily--ctable-component model))
       (setq-local buffer-read-only t))))
+
+(defun daily-refresh ()
+  ""
+  (let* ((count (daily-one-count))
+         (page-count (1+ (/ count (daily-filter-page-size daily--filter))))
+         (data (daily-one-list daily--filter)))
+    (with-current-buffer (get-buffer-create daily--buffer-name)
+      (daily-ui-render :current-page (daily-filter-page-num daily--filter)  :page-count page-count :count count :data data))))
 
 (define-minor-mode daily-text-mode
   "Minor mode for daily text editing."

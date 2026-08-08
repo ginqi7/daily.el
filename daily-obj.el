@@ -46,10 +46,10 @@
   ((date :initarg :date :reader daily-filter-date :initform nil :writer daily-filter-write-date)
    (text :initarg :text :reader daily-filter-text :initform nil :writer daily-filter-write-text)
    (tags :initarg :tags :reader daily-filter-tags :initform nil :writer daily-filter-write-tags)
-   (sort :initarg :sort :reader daily-filter-sort :initform 'date)
-   (reversed :initarg :reversed :reader daily-filter-reversed :initform t)
-   (page-num :initarg :page-num :reader daily-filter-page-num :initform 1)
-   (page-size :initarg :page-size :reader daily-filter-page-size :initform 1))
+   (sort :initarg :sort :reader daily-filter-sort :initform 'date :writer daily-filter-write-sort)
+   (reversed :initarg :reversed :reader daily-filter-reversed :initform t :writer daily-filter-write-reversed)
+   (page-num :initarg :page-num :reader daily-filter-page-num :initform 1 :writer daily-filter-write-page-num)
+   (page-size :initarg :page-size :reader daily-filter-page-size :initform 1 :writer daily-filter-write-page-size))
   "")
 
 ;;; Internal Functions
