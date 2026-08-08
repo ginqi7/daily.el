@@ -36,24 +36,12 @@
 
 ;;; Internal Variables
 
-(defvar-local daily--current-page 1
-  "Current page number for paginated daily list data in the current buffer")
-
 (defvar-local daily--filter (daily-filter
                              :page-num 1
                              :page-size daily-page-size
                              :sort 'date
                              :reversed t)
   "Holds the daily filter instance with default pagination, sorting, and filtering settings for daily entries.")
-
-(defun daily-filter-reset ()
-  ""
-  (interactive)
-  (setq daily--filter (daily-filter
-                       :page-num 1
-                       :page-size daily-page-size
-                       :sort 'date
-                       :reversed t)))
 
 (defvar-local daily--current-one nil
   "Local variable to store the current daily entry for the buffer.")
@@ -67,17 +55,8 @@
 (defvar daily--accumulate-buffer-name "*daily-accumulate*"
   "Defines a variable to store the name of the accumulate buffer.")
 
-(defvar daily--keymap
-  (let ((map (copy-keymap ctbl:table-mode-map)))
-    (define-key map (kbd "a") #'daily-add)
-    (define-key map (kbd "e") #'daily-edit)
-    (define-key map (kbd "d") #'daily-delete)
-    (define-key map (kbd "<RET>") #'daily-show)
-    (define-key map (kbd "<SPC>") #'daily-preview)
-    (define-key map (kbd "g") #'daily-accumulate)
-    (define-key map (kbd "f") #'daily-set-filter)
-    map)
-  "Keymap defining daily commands")
+(defvar daily--selected-list nil
+  "List storing the currently selected daily entries.")
 
 ;;; Internal Functions
 (defun daily--filter-exp-to-str (exp)
@@ -98,11 +77,6 @@
     (erase-buffer)
     (insert (daily-one-text one))
     (daily-text-mode)))
-
-(defun daily--dashboard-width ()
-  "Calculates the usable dashboard width by subtracting the left and right window margins from the total window width."
-  (let ((margins (window-margins)))
-    (- (window-width) (or (car margins) 0) (or (cdr margins) 0))))
 
 (defun daily--uuid ()
   "Return string with random (version 4) UUID."
@@ -161,6 +135,16 @@
                                      (string-join (mapcar #'daily-tag-name (daily-one-tags one)) ",")))))
 
 ;;; Interactive Functions
+
+(defun daily-filter-reset ()
+  "Reset the daily filter to its default pagination, sorting, and ordering settings."
+  (interactive)
+  (setq daily--filter (daily-filter
+                       :page-num 1
+                       :page-size daily-page-size
+                       :sort 'date
+                       :reversed t)))
+
 (defun daily-set-filter-date (&optional date-filter)
   "Prompts the user to update the date filter expression for the daily filter. If an optional date filter is provided, it uses that; otherwise, it defaults to the current date filter or a generic filter expression. The function converts the filter expression to a string for display, lets the user modify it via an interactive prompt, updates the daily filter with the new value, and then refreshes the interface."
   (interactive)
@@ -217,37 +201,29 @@
   (daily-refresh))
 
 (defun daily-set-filter ()
-  "Sets the daily filter based on the selected data row and column in the component. Depending on the selected column (date, text, or tags), it prompts the user to input a new filter value, updates the appropriate field in the filter object, and refreshes the daily view."
+  "Prompt the user to select a filter category and update the daily filter accordingly."
   (interactive)
-  (let* ((cp (ctbl:cp-get-component))
-         (row (ctbl:cp-get-selected-data-row cp))
-         (cell (ctbl:cp-get-selected-data-cell cp))
-         (col-num (cdr (ctbl:cp-get-selected cp)))
-         (uuid (car (last row)))
-         (one (daily-one-get uuid)))
-    (pcase col-num
-      (0 (daily-set-filter-date `(like date ,cell)))
-      (1 (daily-set-filter-text))
-      (2 (daily-set-filter-tags (string-split cell ","))))))
+  (when-let* ((col (completing-read "Filter: " '(date text tags))))
+    (pcase col
+      ("date" (daily-set-filter-date))
+      ("text" (daily-set-filter-text))
+      ("tags" (daily-set-filter-tags)))))
 
 (defun daily-accumulate ()
-  "Accumulates daily entries by retrieving data from the current component's model, processing each entry through conversions, and inserting their org-mode representations into a dedicated accumulate buffer before switching to it."
+  "Collect selected daily entries into a dedicated Org-mode buffer and display it."
   (interactive)
-  (let* ((cp (ctbl:cp-get-component))
-         (model (ctbl:cp-get-model cp))
-         (data (ctbl:model-data model)))
+  (when-let* ((selected-list daily--selected-list))
     (with-current-buffer (get-buffer-create daily--accumulate-buffer-name)
       (erase-buffer)
       (org-mode)
-      (mapcar #'insert (mapcar #'daily-obj-to-org (mapcar #'daily-one-get (mapcar #'car (mapcar #'last data)))))
-      (switch-to-buffer (current-buffer)))))
+      (mapcar #'insert (mapcar #'daily-obj-to-org selected-list))
+      (switch-to-buffer (current-buffer))))
+  (setq daily--selected-list nil))
 
 (defun daily-show ()
   "Interactively retrieves the selected daily entry by obtaining its unique identifier, fetches the entry, displays its content using an internal display function, and switches to a designated text buffer."
   (interactive)
-  (let* ((row (ctbl:cp-get-selected-data-row (ctbl:cp-get-component)))
-         (uuid (car (last row)))
-         (one (daily-one-get uuid)))
+  (when-let* ((one (car daily--selected-list)))
     (daily--show-one one)
     (pop-to-buffer daily--text-buffer-name)))
 
@@ -281,28 +257,24 @@
 (defun daily-delete ()
   "Deletes the selected daily entry. The function retrieves the currently selected row's data, extracting the unique identifier, date, and text. It then prompts the user for confirmation to delete the entry, displaying the date and text. Upon confirmation, it deletes the entry identified by the unique identifier and refreshes the display."
   (interactive)
-  (let* ((row (ctbl:cp-get-selected-data-row (ctbl:cp-get-component)))
-         (uuid (car (last row)))
-         (date (car row))
-         (text (cadr row)))
-    (when (yes-or-no-p (format "Are you sure to delete the row? [%s](%s)" date text))
-      (daily-one-delete uuid)
-      (daily-refresh))))
+  (when-let* ((selected-list daily--selected-list))
+    (when (yes-or-no-p (format "Are you sure to delete the selected rows? [%s rows]" (length selected-list)))
+      (mapcar #'daily-one-delete (mapcar #'daily-obj-uuid selected-list))
+      (daily-refresh)
+      (setq daily--selected-list nil))))
 
 (defun daily-edit ()
   "Edits a daily entry based on the selected row and column in the daily interface. The function retrieves the current table component, selected row, selected column, and the unique identifier from the row. It then fetches the corresponding daily entry and calls the appropriate editing routine depending on the selected column (date, text, or tags). Finally, it saves the changes to the entry and refreshes the interface."
   (interactive)
-  (let* ((cp (ctbl:cp-get-component))
-         (row (ctbl:cp-get-selected-data-row cp))
-         (col-num (cdr (ctbl:cp-get-selected cp)))
-         (uuid (car (last row)))
-         (one (daily-one-get uuid)))
-    (pcase col-num
-      (0 (daily--edit-one-date one))
-      (1 (daily--edit-one-text one))
-      (2 (daily--edit-one-tags one)))
+  (when-let* ((one (car daily--selected-list))
+              (col (completing-read "Edit: " '(date text tags))))
+    (pcase col
+      ("date" (daily--edit-one-date one))
+      ("text" (daily--edit-one-text one))
+      ("tags" (daily--edit-one-tags one)))
     (daily-one-insert-or-update one)
-    (daily-refresh)))
+    (daily-refresh)
+    (setq daily--selected-list nil)))
 
 (defun daily-edit-text-submit ()
   "Interactively submits the edited text for the current daily entry. When the user confirms via a yes-no prompt, it captures the buffer's entire content as the new text, updates the current case, persists the changes, and refreshes the display."
@@ -319,73 +291,32 @@
   "Initializes the daily database, refreshes the display, and switches to the daily buffer for user interaction."
   (interactive)
   (daily-db-init)
+  (daily-filter-reset)
   (daily-refresh)
   (switch-to-buffer daily--buffer-name))
 
-(defun daily-insert-dashboard-text ()
-  "Generates and inserts the dashboard header in the daily interface. It calculates the total entry count and determines the page number and total page count. The header includes a title with count and page information, a line of key command instructions, and decorative separator lines created with repeated characters, all styled with designated text properties."
-  (let* ((count (daily-one-count))
-         (page-count (1+ (/ count daily-page-size)))
-         (title (format "Daily Text | Total: [%d] | Page: %s/%d  \n" count (buttonize (format "%s" daily--current-page) nil) page-count))
-         (keys (concat "[SPC] view, [RET] open, [a] add, [e] edit, [d] delete, [g] accumulate, [+] more, [q] quit\n"
-                       "[f] filter\n"))
-         (eq-char ?═)
-         (dash-char ?─)
-         (eq-line (concat (make-string (daily--dashboard-width) eq-char) "\n"))
-         (dash-line (concat (make-string (daily--dashboard-width) dash-char) "\n")))
-   (insert (propertize title 'tiles-header t)
-           (propertize eq-line 'face 'font-lock-comment-face 'tiles-header t)
-           (propertize keys 'face 'font-lock-comment-face 'tiles-header t)
-           (propertize dash-line 'face 'font-lock-comment-face 'tiles-header t)
-           (concat "Filters | Date: "
-                   (buttonize (format "%s" (daily--filter-exp-to-str (daily-filter-date daily--filter)))
-                              (lambda (_) (daily-set-filter-date)))
-                   " | Text: "
-                   (buttonize (format "%s" (daily--filter-exp-to-str (daily-filter-text daily--filter)))
-                              (lambda (_) (daily-set-filter-text)))
-                   " | Tags: "
-                   (buttonize (format "%s" (daily--filter-exp-to-str (daily-filter-tags daily--filter)))
-                              (lambda (_) (daily-set-filter-tags)))
-                   "\n"))))
-
 (defun daily-refresh ()
-  "Refreshes the daily interface. The function calculates dynamic widths for the date, text, and tags columns based on the dashboard width and current date format. It then builds a column model with title, alignment, and width settings, and obtains the data by converting daily entries to printable format. With the daily buffer created or retrieved, it disables the header display, erases the buffer if the table component is not present, inserts the dashboard header text, creates the table component with the specified model and keymap, and finally updates the table model with the new data while setting the buffer to read-only."
-  (let* ((param (copy-ctbl:param ctbl:default-rendering-param))
-         (date-length (length (format-time-string daily-time-format)))
-         (tags-length 20)
-         (text-length (- (daily--dashboard-width) date-length tags-length))
-         (column-model ; column model
-          (list (make-ctbl:cmodel
-                 :title "Date" :sorter 'ctbl:sort-string-lessp
-                 :align 'right
-                 :min-width date-length :max-width date-length)
-                (make-ctbl:cmodel
-                 :title "Text" :align 'left
-                 :min-width text-length :max-width text-length)
-                (make-ctbl:cmodel
-                 :title "Tags" :align 'left
-                 :min-width tags-length :max-width tags-length)))
-         (data (mapcar #'daily-obj-to-printable (daily-one-list daily--filter)))
-         (model (make-ctbl:model :column-model column-model :data data)))
-    (with-current-buffer (get-buffer-create daily--buffer-name)
-      (let ((buffer-read-only nil)
-            (inhibit-read-only t))
-        (setf (ctbl:param-display-header param) nil)
-        (erase-buffer)
-        (daily-insert-dashboard-text)
-        (goto-char (point-max))
-        (setq-local daily--ctable-component (ctbl:create-table-component-region :model model :param param :keymap daily--keymap))
-        (ctbl:cp-add-click-hook daily--ctable-component (lambda ()))
-        (ctbl:cp-set-model daily--ctable-component model))
-      (setq-local buffer-read-only t))))
-
-(defun daily-refresh ()
-  ""
+  "Update the daily buffer by recalculating pagination and rendering entries according to the current filter."
   (let* ((count (daily-one-count))
          (page-count (1+ (/ count (daily-filter-page-size daily--filter))))
          (data (daily-one-list daily--filter)))
     (with-current-buffer (get-buffer-create daily--buffer-name)
+      (daily-mode 1)
       (daily-ui-render :current-page (daily-filter-page-num daily--filter)  :page-count page-count :count count :data data))))
+
+(define-minor-mode daily-mode
+  "Minor mode for daily."
+  :lighter " Daily"
+  :keymap
+  (let ((map (make-sparse-keymap)))
+    (define-key map (kbd "a") #'daily-add)
+    (define-key map (kbd "e") #'daily-edit)
+    (define-key map (kbd "d") #'daily-delete)
+    (define-key map (kbd "<RET>") #'daily-show)
+    (define-key map (kbd "<SPC>") #'daily-preview)
+    (define-key map (kbd "g") #'daily-accumulate)
+    (define-key map (kbd "f") #'daily-set-filter)
+    map))
 
 (define-minor-mode daily-text-mode
   "Minor mode for daily text editing."

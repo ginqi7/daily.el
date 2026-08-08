@@ -139,5 +139,9 @@
    :tags (when (slot-boundp obj 'tags)
            (mapcar #'daily-tag--to-plist (daily-one-tags obj)))))
 
+(cl-defmethod daily-one-equal ((obj1 daily-one) (obj2 daily-one))
+  "Compare two daily-one objects for equality by comparing their unique identifiers."
+  (equal (daily-obj-uuid obj1) (daily-obj-uuid obj2)))
+
 (provide 'daily-obj)
 ;;; daily-obj.el ends here

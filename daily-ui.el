@@ -61,11 +61,11 @@
                        "[f] filter"))
          (eq-char ?═)
          (dash-char ?─)
-         (eq-line (make-string (daily--dashboard-width) eq-char))
-         (dash-line (make-string (daily--dashboard-width) dash-char))
+         (eq-line (make-string (daily-ui--dashboard-width) eq-char))
+         (dash-line (make-string (daily-ui--dashboard-width) dash-char))
          (date-length (length (format-time-string daily-time-format)))
          (tags-length 20)
-         (text-length (- (daily--dashboard-width) date-length tags-length)))
+         (text-length (- (daily-ui--dashboard-width) date-length tags-length)))
     (vui-vstack
      (vui-heading title)
      (vui-heading eq-line)
@@ -82,8 +82,18 @@
 
 (cl-defmethod daily-obj-to-row ((obj daily-one))
   (append
-   (list (vui-checkbox))
+   (list (vui-checkbox :checked (member-if (lambda (one) (daily-one-equal one obj)) daily--selected-list)
+                       :on-change (lambda (v)
+                                    (if v (add-to-list 'daily--selected-list obj)
+                                      (setq daily--selected-list
+                                            (cl-delete-if (lambda (one) (daily-one-equal one obj)) daily--selected-list)))
+                                    (daily-refresh))))
    (daily-obj-to-printable obj)))
+
+(defun daily-ui--dashboard-width ()
+  "Calculates the usable dashboard width by subtracting the left and right window margins from the total window width."
+  (let ((margins (window-margins)))
+    (- (window-width) (or (car margins) 0) (or (cdr margins) 0))))
 
 (defun daily-ui-render (&rest props)
   (let ((vui-width-mode 'pixel))
