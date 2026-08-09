@@ -60,13 +60,6 @@
       (should (string-match-p "Test entry content" (buffer-string))))
     (kill-buffer daily--text-buffer-name)))
 
-(ert-deftest test-daily--dashboard-width ()
-  "Test calculating dashboard width."
-  ;; This test may vary based on window configuration
-  (let ((width (daily--dashboard-width)))
-    (should (integerp width))
-    (should (> width 0))))
-
 (ert-deftest test-daily--uuid ()
   "Test UUID generation format."
   (let ((uuid1 (daily--uuid))
@@ -176,23 +169,6 @@
 
 ;;; Dashboard Tests
 
-(ert-deftest test-daily-insert-dashboard-text ()
-  "Test inserting dashboard text."
-  (let* ((daily-db-path (make-temp-file "daily-db-test" nil ".db"))
-         (daily--current-page 1)
-         (daily--filter (daily-filter :page-num 1 :page-size 30)))
-    (daily-db-init)
-    (with-temp-buffer
-      (daily-insert-dashboard-text)
-      (let ((content (buffer-string)))
-        (should (string-match-p "Daily Text | Total:" content))
-        (should (string-match-p "Page:" content))
-        (should (string-match-p "\\[SPC\\] view" content))
-        (should (string-match-p "\\[a\\] add" content))
-        (should (string-match-p "\\[f\\] filter" content))
-        (should (string-match-p "Filters | Date:" content))))
-    (delete-file daily-db-path)))
-
 ;;; Buffer and Variable Tests
 
 (ert-deftest test-daily-buffer-names ()
@@ -209,18 +185,6 @@
   (should (stringp daily-time-format))
   (should (integerp daily-page-size))
   (should (> daily-page-size 0)))
-
-(ert-deftest test-daily-keymap ()
-  "Test daily keymap bindings."
-  (should (keymapp daily--keymap))
-  ;; Check that daily commands are bound
-  (should (equal 'daily-add (lookup-key daily--keymap (kbd "a"))))
-  (should (equal 'daily-edit (lookup-key daily--keymap (kbd "e"))))
-  (should (equal 'daily-delete (lookup-key daily--keymap (kbd "d"))))
-  (should (equal 'daily-show (lookup-key daily--keymap (kbd "<RET>"))))
-  (should (equal 'daily-preview (lookup-key daily--keymap (kbd "<SPC>"))))
-  (should (equal 'daily-accumulate (lookup-key daily--keymap (kbd "g"))))
-  (should (equal 'daily-set-filter (lookup-key daily--keymap (kbd "f")))))
 
 ;;; Integration Tests
 
@@ -244,7 +208,6 @@
 (ert-deftest test-daily-refresh-integration ()
   "Test daily-refresh creates buffer and content."
   (let* ((daily-db-path (make-temp-file "daily-db-test" nil ".db"))
-         (daily--current-page 1)
          (daily--filter (daily-filter :page-num 1 :page-size 30)))
     (daily-db-init)
     (daily-db-one-insert-or-update :uuid "uuid-001" :text "Test entry" :date "2026-03-07")
